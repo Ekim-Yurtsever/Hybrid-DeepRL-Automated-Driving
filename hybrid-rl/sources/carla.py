@@ -21,16 +21,11 @@ from queue import Queue
 # -- Navigation imports ----------------------------------------------------------
 # ==============================================================================
 
-from agents.navigation.global_route_planner import GlobalRoutePlanner
-from agents.navigation.global_route_planner_dao import GlobalRoutePlannerDAO
-from agents.navigation.modified_local_planner import ModifiedLocalPlanner
-from agents.tools.misc import draw_waypoints
-from enum import Enum
-from collections import deque
+from sources.navigation.global_route_planner import GlobalRoutePlanner
+from sources.navigation.global_route_planner_dao import GlobalRoutePlannerDAO
+from sources.navigation.modified_local_planner import ModifiedLocalPlanner
+
 import time
-import cv2
-from PIL import Image
-import matplotlib.pyplot as plt
 
 # ==============================================================================
 # -- Get colors for debugging --------------------------------------------------
@@ -413,9 +408,9 @@ class CarlaEnv:
         v = self.vehicle.get_velocity()
         kmh = 3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2)
 
-        d2wp, d2goal, numbers, control = self.world._local_planner.run_step(debug=False)
-        # d2wp = 10
-        # d2goal = 100
+        # d2wp, d2goal, numbers, control = self.world._local_planner.run_step(debug=False)
+        d2wp = 10
+        d2goal = 100
 
         done = False
 
@@ -442,7 +437,6 @@ class CarlaEnv:
         # Weights rewards (not for terminal state)
         if not self.playing and settings.WEIGHT_REWARDS_WITH_EPISODE_PROGRESS and not done:
             reward *= (time.time() - self.episode_start) / self.seconds_per_episode.value
-
 
         self.prev_d2goal = d2goal
 
@@ -973,13 +967,19 @@ class CarlaEnvSettings:
                                 try:
                                     # Get random spot from a list from predefined spots and try to spawn a car there
                                     spawn_point = random.choice(self.spawn_points)
-                                    car_actor = self.world.spawn_actor(car_blueprint, spawn_point)
+                                    car_actor = self.world.try_spawn_actor(car_blueprint, spawn_point)
                                     car_actor.set_autopilot()
                                     break
                                 except:
                                     retries += 1
                                     time.sleep(0.1)
                                     continue
+
+                            # Get random spot from a list from predefined spots and try to spawn a car there
+                            # spawn_point = random.choice(self.spawn_points)
+                            # car_actor = self.world.try_spawn_actor(car_blueprint, spawn_point)
+                            # car_actor.set_autopilot()
+
 
                             # Create the collision sensor and attach it to the car
                             colsensor = self.world.spawn_actor(self.collision_sensor, carla.Transform(), attach_to=car_actor)

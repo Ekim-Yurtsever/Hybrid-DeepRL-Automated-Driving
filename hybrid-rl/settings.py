@@ -1,7 +1,8 @@
 # Carla environment settings
 # CARLA_PATH = '../CARLA_0.9.6_Python_3.7'  # Path to Carla root folder
 # CARLA_PATH = '/home/linda/Carla0.9.6/carla0.9.6/PythonAPI/carla/dist' # Path to Carla root folder
-CARLA_PATH = '/home/linda/Carla0.9.7' # Path to Carla root folder, include FULL path
+# CARLA_PATH = '/home/linda/Carla0.9.7' # Path to Carla root folder, include FULL path
+CARLA_PATH = '/home/linda/Carla0.9.6/carla0.9.6' # Path to Carla root folder, include FULL path
 CARLA_HOSTS_TYPE = 'local'  # 'local' or 'remote', 'local' means that script can start and restart Carla Simulator
 CARLA_HOSTS_NO = 1 # original 1
 CARLA_HOSTS = [['localhost', 2000, 10], ['localhost', 2002, 10]]  # List of hosts and ports and worlds to use, at least 2 ports of difference as Carla uses N and N+1 port, Town01 to Town97 for world currently, Town01 to Town07 for world are currently available, int number instead - random world change interval in minutes
@@ -9,7 +10,7 @@ SECONDS_PER_EPISODE = 10 # Original 10
 EPISODE_FPS = 60  # Desired
 IMG_WIDTH = 480
 IMG_HEIGHT = 270
-CAR_NPCS = 0 # original 50 npcs
+CAR_NPCS = 50 # original 50 npcs
 RESET_CAR_NPC_EVERY_N_TICKS = 1  # Resets one car NPC every given number of ticks, tick is about a second
 # ACTIONS = ['forward', 'forward_left', 'forward_right', 'brake', 'brake_left', 'brake_right']  # ['forward', 'left', 'right', 'forward_left', 'forward_right', 'backwards', 'backwards_left', 'backwards_right']
 ACTIONS = ['forward_slow', 'forward_medium', 'forward_fast', 'left_slow', 'left_medium', 'left_fast', 'right_slow', 'right_medium', 'right_fast', 'brake_light', 'brake_medium', 'brake_full']
