@@ -13,8 +13,8 @@ from collections import deque
 import random
 
 import carla
-from agents.navigation.modified_controller import VehiclePIDController
-from agents.tools.misc import distance_vehicle, draw_waypoints
+from sources.navigation.modified_controller import VehiclePIDController
+from sources.navigation.misc import distance_vehicle, draw_waypoints
 import math
 
 class RoadOption(Enum):

@@ -7,15 +7,6 @@ try:
     sys.path.append(glob.glob(settings.CARLA_PATH + f'/PythonAPI/carla/dist/carla-*{sys.version_info.major}.{sys.version_info.minor}-{"win-amd64" if os.name == "nt" else "linux-x86_64"}.egg')[0])
 except IndexError:
     pass
-
-# try:
-#     sys.path.append(glob.glob(settings.CARLA_PATH + '/PythonAPI/carla/dist/carla-*%d.%d-%s.egg' % (
-#         sys.version_info.major,
-#         sys.version_info.minor,
-#         'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
-# except IndexError:
-#     pass
-
 import carla
 import time
 import random
@@ -34,8 +25,6 @@ from sources.navigation.global_route_planner import GlobalRoutePlanner
 from sources.navigation.global_route_planner_dao import GlobalRoutePlannerDAO
 from sources.navigation.modified_local_planner import ModifiedLocalPlanner
 
-from numpy import random
-
 # ==============================================================================
 # -- Get colors for debugging --------------------------------------------------
 # ==============================================================================
@@ -49,7 +38,6 @@ orange = carla.Color(255, 162, 0)
 white = carla.Color(255, 255, 255)
 
 # ==============================================================================
-
 
 @dataclass
 class ACTIONS:
@@ -116,13 +104,13 @@ class CarlaEnv:
     # -- Navigation functions -------------------------------------------------------
     # ==============================================================================
 
-    def total_distance(self, current_plan):
+    def total_distance(self,current_plan):
         sum = 0
         for i in range(len(current_plan) - 1):
             sum = sum + self.distance_wp(current_plan[i + 1][0], current_plan[i][0])
         return sum
 
-    def distance_wp(self, target, current):
+    def distance_wp(self,target, current):
         dx = target.transform.location.x - current.transform.location.x
         dy = target.transform.location.y - current.transform.location.y
         return math.sqrt(dx * dx + dy * dy)
@@ -144,10 +132,10 @@ class CarlaEnv:
             w1 = current_plan[i][0]
             w2 = current_plan[i + 1][0]
             self.world.debug.draw_line(w1.transform.location, w2.transform.location, thickness=0.5,
-                                       color=green, life_time=30.0)
+                                  color=green, life_time=120.0)
         self.draw_waypoint_info(world, current_plan[-1][0])
 
-    def draw_waypoint_info(self, world, w, lt=30):
+    def draw_waypoint_info(self, world, w, lt=120):
         w_loc = w.transform.location
         world.debug.draw_point(w_loc, 0.5, red, lt)
 
@@ -172,7 +160,7 @@ class CarlaEnv:
         vehicles = self.world.get_blueprint_library().filter("vehicle.*")
         choices = [x for x in vehicles if int(x.get_attribute('number_of_wheels')) == 4]
         self.mycar = random.choice(choices)
-        self.obs = random.choice(choices)
+        # self.obs = random.choice(choices)
 
         # Sensors and helper lists
         self.collision_hist = []
@@ -190,7 +178,7 @@ class CarlaEnv:
         self.playing = playing
 
         # Used with additional preview feature
-        self.preview_camera_enabled = False
+        self.preview_camera_enabled = False # Originally False
 
         # Sets actually configured actions
         self.actions = [getattr(ACTIONS, action) for action in settings.ACTIONS]
@@ -200,10 +188,6 @@ class CarlaEnv:
         # self.d2goal = 10000
         # self.d2wp = 8
 
-
-
-    # Resets environment for new episode
-    def reset(self):
         ##########################3
         self.map = self.world.get_map()
         self.d2goal = 10000
@@ -212,6 +196,18 @@ class CarlaEnv:
         self.grp = GlobalRoutePlanner(self.dao)
         self.grp.setup()
         ###################
+
+    # Resets environment for new episode
+    def reset(self):
+
+        # ##########################3
+        # self.map = self.world.get_map()
+        # self.d2goal = 10000
+        # # Initialize the route planner
+        # self.dao = GlobalRoutePlannerDAO(self.map, 2.0)  # Create a route for every 2m
+        # self.grp = GlobalRoutePlanner(self.dao)
+        # self.grp.setup()
+        # ###################
 
         # Car, sensors, etc. We create them every episode then destroy
         self.actor_list = []
@@ -224,10 +220,10 @@ class CarlaEnv:
             try:
                 # Get random spot from a list from predefined spots and try to spawn a car there
                 # self.transform = random.choice(self.world.get_map().get_spawn_points())
-                # self.vehicle = self.world.spawn_actor(self.mycar, self.transform)
+                # self.vehicle = self.world.spawn_actor(self.model_3, self.transform)
 
+                # First trace a route, then spawn the player
                 spawn_points = self.map.get_spawn_points()
-
                 while self.d2goal > 150 or self.d2goal < 50:
                     pos_a = random.choice(spawn_points)
                     pos_b = random.choice(spawn_points)
@@ -242,10 +238,6 @@ class CarlaEnv:
                 self.transform = pos_a
                 self.vehicle = self.world.try_spawn_actor(self.mycar, self.transform)
 
-                # self.transform = random.choice(self.world.get_map().get_spawn_points())
-                # self.vehicle = self.world.spawn_actor(self.mycar, self.transform)
-                # self.vehicle.set_transform(pos_a)
-
                 args_lateral_dict = {
                     'K_P': 2,  # 1
                     'K_D': 0.2,  # 0.02
@@ -259,18 +251,13 @@ class CarlaEnv:
                 assert self.current_plan
                 self._local_planner.set_global_plan(self.current_plan)
                 self.current_plan = self.current_plan[0:len(self.current_plan) - 5][:]
-
-                # self.d2goal = self.total_distance(self.current_plan)
+                self.d2goal = self.total_distance(self.current_plan)
                 # self.d2wp =  self.total_distance(self.current_plan[0:1][:])
                 # self.goal = self.current_plan[-1][0]
                 # self.start_point = self.current_plan[1][0]
 
                 # Draw path for debugging
                 self.draw_path(self.world, self.current_plan)
-
-
-
-
 
                 break
             except:
@@ -361,25 +348,12 @@ class CarlaEnv:
         # Remember a time of episode start (used to measure duration and set a terminal state)
         self.episode_start = time.time()
 
-        ## Add one vehicle on our specific route
-        obs_wp = self.current_plan[math.ceil(len(self.current_plan) / 1.3)][0]
-        car_actor = self.world.try_spawn_actor(self.obs, pos_b)
-        car_actor.set_transform(obs_wp.transform)
-
-        # We set the vehicle on the road, with random moving according to a discrete uniform distribution
-        car_actor = self.world.try_spawn_actor(self.obs, pos_b)
-
-        if random.randint(0,10) < 5:
-            obs_wp = self.current_plan[math.ceil(len(self.current_plan) / 3)][0]
-            car_actor.set_autopilot()
-        else:
-            obs_wp = self.current_plan[math.ceil(len(self.current_plan) / 2)][0]
-
-        car_actor.set_transform(obs_wp.transform)
-
-
-        self.actor_list.append(car_actor) # No le pongo sensor porque a este pobre solo lo voy a usar como prop
-
+        # ## Add one vehicle on our specific route
+        # obs_wp = self.current_plan[math.ceil(len(self.current_plan) / 3)][0]
+        # car_actor = self.world.try_spawn_actor(self.obs, pos_b)
+        # car_actor.set_transform(obs_wp.transform)
+        # # car_actor.set_autopilot()
+        # self.actor_list.append(car_actor)
 
         # # Get the blueprint of the sensor, I don't care about the poor other car, no col sensor
         # colsens = self.world.get_blueprint_library().find('sensor.other.collision')
@@ -389,8 +363,8 @@ class CarlaEnv:
         #
         # # Register a callback called every time sensor sends a new data
         # colsensor.listen(self._collision_data)
-
-        # Add the car and collision sensor to the list of car NPCs
+        #
+        # # Add the car and collision sensor to the list of car NPCs
         # self.actor_list.append(self.colsensor)
 
         # Return first observation space - current image from the camera sensor
@@ -451,7 +425,7 @@ class CarlaEnv:
     def step(self, action):
 
         # Monitor if carla stopped sending images for longer than a second. If yes - it broke
-        if time.time() > self.last_cam_update + 1:
+        if time.time() > self.last_cam_update + 5:
             raise Exception('Missing updates from Carla')
 
         # Apply control to the vehicle based on an action
@@ -461,23 +435,6 @@ class CarlaEnv:
         # Calculate speed in km/h from car's velocity (3D vector)
         v = self.vehicle.get_velocity()
         kmh = 3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2)
-
-        # done = False
-        #
-        # # If car collided - end and episode and send back a penalty
-        # if len(self.collision_hist) != 0:
-        #     done = True
-        #     reward = -1
-        #
-        # # Reward
-        # elif settings.WEIGHT_REWARDS_WITH_SPEED == 'discrete':
-        #     reward = settings.SPEED_MIN_REWARD if kmh < 50 else settings.SPEED_MAX_REWARD
-        #
-        # elif settings.WEIGHT_REWARDS_WITH_SPEED == 'linear':
-        #     reward = kmh * (settings.SPEED_MAX_REWARD - settings.SPEED_MIN_REWARD) / 100 + settings.SPEED_MIN_REWARD
-        #
-        # elif settings.WEIGHT_REWARDS_WITH_SPEED == 'quadratic':
-        #     reward = (kmh / 100) ** 1.3 * (settings.SPEED_MAX_REWARD - settings.SPEED_MIN_REWARD) + settings.SPEED_MIN_REWARD
 
         # d2wp, d2goal, numbers, control = self.world._local_planner.run_step(debug=False)
         d2wp = 10
@@ -499,7 +456,7 @@ class CarlaEnv:
 
         elif d2goal <= eps:
             done = True
-            reward = 100  # original 1
+            reward = 100 # original 1
 
         # If episode duration limit reached - send back a terminal state
         if not self.playing and self.episode_start + self.seconds_per_episode.value < time.time():
@@ -509,7 +466,9 @@ class CarlaEnv:
         if not self.playing and settings.WEIGHT_REWARDS_WITH_EPISODE_PROGRESS and not done:
             reward *= (time.time() - self.episode_start) / self.seconds_per_episode.value
 
-        return [self.front_camera, kmh, d2goal, d2wp], reward, done, None
+        self.prev_d2goal = d2goal
+
+        return [self.front_camera, kmh, d2wp, d2goal], reward, done, None
 
     # Destroys all agents created from last .reset() call
     def destroy_agents(self):
@@ -621,7 +580,8 @@ def restart(playing=False):
     if settings.CARLA_HOSTS_TYPE == 'local':
         for process_no in range(1 if playing else settings.CARLA_HOSTS_NO):
             # subprocess.Popen(get_exec_command()[1] + f' -carla-rpc-port={settings.CARLA_HOSTS[process_no][1]}', cwd=settings.CARLA_PATH, shell=True)
-            subprocess.Popen('SDL_VIDEODRIVER=offscreen ' + get_exec_command()[1] + f' -carla-rpc-port={settings.CARLA_HOSTS[process_no][1]}', cwd=settings.CARLA_PATH, shell=True)
+            subprocess.Popen('SDL_VIDEODRIVER=offscreen ' + get_exec_command()[1] + f' -carla-rpc-port={settings.CARLA_HOSTS[process_no][1]}',
+                             cwd=settings.CARLA_PATH, shell=True)
             time.sleep(2)
 
     # Wait for Carla Simulator to be ready
@@ -789,6 +749,30 @@ class CarlaEnvSettings:
         # List of communications objects allowing Carla to pause agents (on changes like world change)
         self.agent_pauses = agent_pauses
 
+        # Initialize map and route
+        ##########################3
+        # self.map = self.world.get_map()
+        # self.d2goal = 10000
+        # # Initialize the route planner
+        # self.dao = GlobalRoutePlannerDAO(self.map, 2.0)  # Create a route for every 2m
+        # self.grp = GlobalRoutePlanner(self.dao)
+        # self.grp.setup()
+        #
+        # spawn_points = self.map.get_spawn_points()
+        # while self.d2goal > 150 or self.d2goal < 50:
+        #     pos_a = random.choice(spawn_points)
+        #     pos_b = random.choice(spawn_points)
+        #
+        #     a = pos_a.location
+        #     b = pos_b.location
+        #
+        #     self.current_plan = self.grp.trace_route(a, b)
+        #
+        #     self.d2goal = self.total_distance(self.current_plan)
+        #
+        # self.transform = pos_a
+        ###################
+
     # Collect NPC collision data
     def _collision_data(self, collision):
         self.collisions.put(collision)
@@ -820,6 +804,8 @@ class CarlaEnvSettings:
             for actor in self.spawned_car_npcs[car_npc]:
                 if hasattr(actor, 'is_listening') and actor.is_listening:
                     actor.stop()
+                    # avoid sensor stream error
+                    # actor.destroy()
 
         # Reset NPC car list
         self.spawned_car_npcs = {}
@@ -996,7 +982,7 @@ class CarlaEnvSettings:
                         self._destroy_car_npc(car_npc)
 
                     # If we reached despawn tick, remove oldest NPC
-                    # The reson we want to do that is to rotate cars aroubd the map
+                    # The reason we want to do that is to rotate cars around the map
                     if car_despawn_tick >= self.car_npcs[1] and len(self.spawned_car_npcs):
 
                         # Get id of the first car on a list and destroy it
@@ -1011,9 +997,9 @@ class CarlaEnvSettings:
                         # How many cars to spawn (up to 10)
                         cars_to_spawn = min(10, self.car_npcs[0] - len(self.spawned_car_npcs))
 
-                        # Sometimes we can;t spawn a car
+                        # Sometimes we cannot spawn a car
                         # It might be because spawn point is being occupied or because Carla broke
-                        # We count errores and break on 5
+                        # We count errors and break on 5
                         retries = 0
 
                         # Iterate over number of cars to spawn
@@ -1031,11 +1017,20 @@ class CarlaEnvSettings:
                             car_blueprint.set_attribute('role_name', 'autopilot')
 
                             # Try to spawn a car
+                            # spawn_point = random.choice(self.spawn_points)
+                            # car_actor = self.world.try_spawn_actor(car_blueprint, spawn_point)
+                            # new_spawn_point = CarlaEnv.current_plan[math.ceil(len(self.current_plan) / 2)][0]
+                            # car_actor.set_transform(new_spawn_point)
+                            # car_actor.set_autopilot()
+
+                            # Try to spawn a car with more cars
                             for _ in range(5):
                                 try:
                                     # Get random spot from a list from predefined spots and try to spawn a car there
                                     spawn_point = random.choice(self.spawn_points)
                                     car_actor = self.world.spawn_actor(car_blueprint, spawn_point)
+                                    # new_spawn_point = CarlaEnv.current_plan[math.ceil(len(self.current_plan) / 2)][0]
+                                    # car_actor.set_transform(new_spawn_point)
                                     car_actor.set_autopilot()
                                     break
                                 except:

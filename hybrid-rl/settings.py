@@ -10,7 +10,7 @@ SECONDS_PER_EPISODE = 10 # Original 10
 EPISODE_FPS = 60  # Desired
 IMG_WIDTH = 480
 IMG_HEIGHT = 270
-CAR_NPCS = 50 # original 50 npcs
+CAR_NPCS = 20 # original 50 npcs
 RESET_CAR_NPC_EVERY_N_TICKS = 1  # Resets one car NPC every given number of ticks, tick is about a second
 # ACTIONS = ['forward', 'forward_left', 'forward_right', 'brake', 'brake_left', 'brake_right']  # ['forward', 'left', 'right', 'forward_left', 'forward_right', 'backwards', 'backwards_left', 'backwards_right']
 ACTIONS = ['forward_slow', 'forward_medium', 'forward_fast', 'left_slow', 'left_medium', 'left_fast', 'right_slow', 'right_medium', 'right_fast', 'brake_light', 'brake_medium', 'brake_full']
@@ -44,7 +44,7 @@ UPDATE_TARGET_EVERY = 100  # Terminal states (end of episodes)
 # MODEL_NAME = '5_residual_#CNN_KERNELS#'  # model name, prefixed from sources/models.py, #MODEL_ARCHITECTURE# adds model architectore acronym, #CNN_KERNELS# adds number of kernels from all CNN layers
 MODEL_NAME = '64x3_#CNN_KERNELS#'  # model name, prefixed from sources/models.py, #MODEL_ARCHITECTURE# adds model architectore acronym, #CNN_KERNELS# adds number of kernels from all CNN layers
 MIN_REWARD = 100  # For model save, original 100
-TRAINER_MEMORY_FRACTION = 0.6 # Original 0.6, 0.4
+TRAINER_MEMORY_FRACTION = 0.4 # Original 0.6, 0.4
 TRAINER_GPU = 0  # None - not set, 0, 1, ... - GPU with given index
 SAVE_CHECKPOINT_EVERY = 100  # episodes, original 100
 
