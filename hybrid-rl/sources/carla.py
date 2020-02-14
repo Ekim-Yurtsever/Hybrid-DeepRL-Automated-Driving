@@ -200,8 +200,6 @@ class CarlaEnv:
         # self.d2goal = 10000
         # self.d2wp = 8
 
-
-
     # Resets environment for new episode
     def reset(self):
         ##########################3
@@ -267,10 +265,6 @@ class CarlaEnv:
 
                 # Draw path for debugging
                 self.draw_path(self.world, self.current_plan)
-
-
-
-
 
                 break
             except:
@@ -479,9 +473,9 @@ class CarlaEnv:
         # elif settings.WEIGHT_REWARDS_WITH_SPEED == 'quadratic':
         #     reward = (kmh / 100) ** 1.3 * (settings.SPEED_MAX_REWARD - settings.SPEED_MIN_REWARD) + settings.SPEED_MIN_REWARD
 
-        # d2wp, d2goal, numbers, control = self.world._local_planner.run_step(debug=False)
+        # d2wp, self.d2goal, wp_in_line = self.world._local_planner.run_step(debug=False)
         d2wp = 10
-        d2goal = 100
+        self.d2goal = 100
 
         done = False
 
@@ -494,10 +488,10 @@ class CarlaEnv:
             done = True
             reward = -1
 
-        elif d2goal > eps:
-            reward = 1 - d2goal / self.prev_d2goal - d2wp / d0 + kmh / kmh0
+        elif self.d2goal > eps:
+            reward = 1 - self.d2goal / self.prev_d2goal - d2wp / d0 + kmh / kmh0
 
-        elif d2goal <= eps:
+        elif self.d2goal <= eps:
             done = True
             reward = 100  # original 1
 
@@ -509,7 +503,9 @@ class CarlaEnv:
         if not self.playing and settings.WEIGHT_REWARDS_WITH_EPISODE_PROGRESS and not done:
             reward *= (time.time() - self.episode_start) / self.seconds_per_episode.value
 
-        return [self.front_camera, kmh, d2goal, d2wp], reward, done, None
+        self.prev_d2goal = self.d2goal
+
+        return [self.front_camera, kmh, self.d2goal, d2wp], reward, done, None
 
     # Destroys all agents created from last .reset() call
     def destroy_agents(self):

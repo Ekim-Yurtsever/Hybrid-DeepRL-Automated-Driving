@@ -226,16 +226,26 @@ class ModifiedLocalPlanner(object):
         if not self._global_plan and len(self._waypoints_queue) < int(self._waypoints_queue.maxlen * 0.5):
             self._compute_next_waypoints(k=100)
 
+        # if len(self._waypoints_queue) == 0:
+        #     control = carla.VehicleControl()
+        #     control.steer = 0.0
+        #     control.throttle = 0.0
+        #     control.brake = 1.0
+        #     control.hand_brake = False
+        #     control.manual_gear_shift = False
+        #     d2goal = 0
+        #     other_d2goal = 0
+        #     return d2goal,other_d2goal,0,control
         if len(self._waypoints_queue) == 0:
-            control = carla.VehicleControl()
-            control.steer = 0.0
-            control.throttle = 0.0
-            control.brake = 1.0
-            control.hand_brake = False
-            control.manual_gear_shift = False
-            d2goal = 0
-            other_d2goal = 0
-            return d2goal,other_d2goal,0,control
+            # control = carla.VehicleControl()
+            # control.steer = 0.0
+            # control.throttle = 0.0
+            # control.brake = 1.0
+            # control.hand_brake = False
+            # control.manual_gear_shift = False
+            d2wp = 8 # avoid divisions by zero
+            d2goal = 10000 # avoid divisions by zero
+            return d2wp, d2goal,0
 
         #   Buffering the waypoints
         if not self._waypoint_buffer:
@@ -251,7 +261,7 @@ class ModifiedLocalPlanner(object):
         # target waypoint
         self.target_waypoint, self._target_road_option = self._waypoint_buffer[0]
         # move using PID controllers
-        control = self._vehicle_controller.run_step(self._target_speed, self.target_waypoint)
+        # control = self._vehicle_controller.run_step(self._target_speed, self.target_waypoint)
 
         # purge the queue of obsolete waypoints
         vehicle_transform = self._vehicle.get_transform()
@@ -265,19 +275,17 @@ class ModifiedLocalPlanner(object):
             for i in range(max_index + 1):
                 self._waypoint_buffer.popleft()
 
-        d2goal = distance_vehicle(self.target_waypoint,vehicle_transform)
+        d2wp = distance_vehicle(self.target_waypoint,vehicle_transform)
 
         if debug:
             draw_waypoints(self._vehicle.get_world(), [self.target_waypoint], self._vehicle.get_location().z + 1.0)
 
         # other_d2goal = self.total_distance(self._current_plan)
-        other_d2goal = self.total_distance(self._waypoints_queue)+d2goal
-
-
+        d2goal = self.total_distance(self._waypoints_queue)+d2wp
 
         # return d2goal, other_d2goal, len(self._waypoints_queue),control
 
-        return d2goal,other_d2goal, len(self._waypoints_queue),control
+        return d2wp,d2goal, len(self._waypoints_queue)
 
 
 def _retrieve_options(list_waypoints, current_waypoint):

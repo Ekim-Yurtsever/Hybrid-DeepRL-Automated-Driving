@@ -9,11 +9,8 @@ import math
 
 import numpy as np
 import networkx as nx
-import matplotlib.pyplot as plt
 
 import carla
-# from agents.navigation.local_planner import RoadOption
-# from agents.tools.misc import vector
 
 from sources.navigation.modified_local_planner import RoadOption
 from sources.navigation.misc import vector

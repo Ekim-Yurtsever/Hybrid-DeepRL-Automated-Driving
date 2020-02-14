@@ -17,7 +17,7 @@ if __name__ == '__main__':
     
     print('Starting...')
 
-    # overal start time
+    # overall start time
     start_time = time.time()
 
     # Create required folders
