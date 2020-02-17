@@ -8,14 +8,6 @@ try:
 except IndexError:
     pass
 
-# try:
-#     sys.path.append(glob.glob(settings.CARLA_PATH + '/PythonAPI/carla/dist/carla-*%d.%d-%s.egg' % (
-#         sys.version_info.major,
-#         sys.version_info.minor,
-#         'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
-# except IndexError:
-#     pass
-
 import carla
 import time
 import random
@@ -165,9 +157,6 @@ class CarlaEnv:
         # Get list of actor blueprints
         blueprint_library = self.world.get_blueprint_library()
 
-        # Get Tesla model 3 blueprint
-        # self.model_3 = blueprint_library.filter('model3')[0]
-
         # Get a random blueprint.
         vehicles = self.world.get_blueprint_library().filter("vehicle.*")
         choices = [x for x in vehicles if int(x.get_attribute('number_of_wheels')) == 4]
@@ -197,19 +186,16 @@ class CarlaEnv:
 
         # Set large initial distance to goal
         self.prev_d2goal = 10000
-        # self.d2goal = 10000
-        # self.d2wp = 8
 
     # Resets environment for new episode
     def reset(self):
-        ##########################3
+        # Init global planner
         self.map = self.world.get_map()
         self.d2goal = 10000
         # Initialize the route planner
         self.dao = GlobalRoutePlannerDAO(self.map, 2.0)  # Create a route for every 2m
         self.grp = GlobalRoutePlanner(self.dao)
         self.grp.setup()
-        ###################
 
         # Car, sensors, etc. We create them every episode then destroy
         self.actor_list = []
@@ -220,10 +206,7 @@ class CarlaEnv:
         spawn_start = time.time()
         while True:
             try:
-                # Get random spot from a list from predefined spots and try to spawn a car there
-                # self.transform = random.choice(self.world.get_map().get_spawn_points())
-                # self.vehicle = self.world.spawn_actor(self.mycar, self.transform)
-
+                # Get all possible spawn points
                 spawn_points = self.map.get_spawn_points()
 
                 while self.d2goal > 150 or self.d2goal < 50:
@@ -240,10 +223,6 @@ class CarlaEnv:
                 self.transform = pos_a
                 self.vehicle = self.world.try_spawn_actor(self.mycar, self.transform)
 
-                # self.transform = random.choice(self.world.get_map().get_spawn_points())
-                # self.vehicle = self.world.spawn_actor(self.mycar, self.transform)
-                # self.vehicle.set_transform(pos_a)
-
                 args_lateral_dict = {
                     'K_P': 2,  # 1
                     'K_D': 0.2,  # 0.02
@@ -258,13 +237,8 @@ class CarlaEnv:
                 self._local_planner.set_global_plan(self.current_plan)
                 self.current_plan = self.current_plan[0:len(self.current_plan) - 5][:]
 
-                # self.d2goal = self.total_distance(self.current_plan)
-                # self.d2wp =  self.total_distance(self.current_plan[0:1][:])
-                # self.goal = self.current_plan[-1][0]
-                # self.start_point = self.current_plan[1][0]
-
                 # Draw path for debugging
-                self.draw_path(self.world, self.current_plan)
+                # self.draw_path(self.world, self.current_plan)
 
                 break
             except:
@@ -372,20 +346,7 @@ class CarlaEnv:
         car_actor.set_transform(obs_wp.transform)
 
 
-        self.actor_list.append(car_actor) # No le pongo sensor porque a este pobre solo lo voy a usar como prop
-
-
-        # # Get the blueprint of the sensor, I don't care about the poor other car, no col sensor
-        # colsens = self.world.get_blueprint_library().find('sensor.other.collision')
-        #
-        # # Create the collision sensor and attach it to the car
-        # colsensor = self.world.spawn_actor(colsens, carla.Transform(), attach_to=car_actor)
-        #
-        # # Register a callback called every time sensor sends a new data
-        # colsensor.listen(self._collision_data)
-
-        # Add the car and collision sensor to the list of car NPCs
-        # self.actor_list.append(self.colsensor)
+        self.actor_list.append(car_actor) 
 
         # Return first observation space - current image from the camera sensor
         return [self.front_camera, 0]
@@ -456,26 +417,7 @@ class CarlaEnv:
         v = self.vehicle.get_velocity()
         kmh = 3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2)
 
-        # done = False
-        #
-        # # If car collided - end and episode and send back a penalty
-        # if len(self.collision_hist) != 0:
-        #     done = True
-        #     reward = -1
-        #
-        # # Reward
-        # elif settings.WEIGHT_REWARDS_WITH_SPEED == 'discrete':
-        #     reward = settings.SPEED_MIN_REWARD if kmh < 50 else settings.SPEED_MAX_REWARD
-        #
-        # elif settings.WEIGHT_REWARDS_WITH_SPEED == 'linear':
-        #     reward = kmh * (settings.SPEED_MAX_REWARD - settings.SPEED_MIN_REWARD) / 100 + settings.SPEED_MIN_REWARD
-        #
-        # elif settings.WEIGHT_REWARDS_WITH_SPEED == 'quadratic':
-        #     reward = (kmh / 100) ** 1.3 * (settings.SPEED_MAX_REWARD - settings.SPEED_MIN_REWARD) + settings.SPEED_MIN_REWARD
-
-        # d2wp, self.d2goal, wp_in_line = self.world._local_planner.run_step(debug=False)
-        d2wp = 10
-        self.d2goal = 100
+        d2wp, self.d2goal, wp_in_line = self._local_planner.run_step(debug=False)
 
         done = False
 
@@ -489,7 +431,23 @@ class CarlaEnv:
             reward = -1
 
         elif self.d2goal > eps:
-            reward = 1 - self.d2goal / self.prev_d2goal - d2wp / d0 + kmh / kmh0
+            if self.d2goal < self.prev_d2goal:
+                d2goal_sign = 0.3
+            else:
+                d2goal_sign = -1
+
+            if d2wp < d0:
+                d2wp_sign = 0.4
+            else:
+                d2wp_sign = -1
+
+            if kmh > kmh0:
+                kmh_sign = 0.3
+            else:
+                kmh_sign = -1
+
+            # reward = 1 + d2goal_sign * self.d2goal / self.prev_d2goal + d2wp_sign * d2wp / d0 + kmh / kmh0
+            reward = d2goal_sign * self.d2goal / self.prev_d2goal + d2wp_sign * d2wp / d0 + kmh_sign * kmh / kmh0
 
         elif self.d2goal <= eps:
             done = True

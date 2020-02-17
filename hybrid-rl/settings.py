@@ -1,7 +1,4 @@
 # Carla environment settings
-# CARLA_PATH = '../CARLA_0.9.6_Python_3.7'  # Path to Carla root folder
-# CARLA_PATH = '/home/linda/Carla0.9.6/carla0.9.6/PythonAPI/carla/dist' # Path to Carla root folder
-# CARLA_PATH = '/home/linda/Carla0.9.7' # Path to Carla root folder, include FULL path
 CARLA_PATH = '/home/linda/Carla0.9.6/carla0.9.6' # Path to Carla root folder, include FULL path
 CARLA_HOSTS_TYPE = 'local'  # 'local' or 'remote', 'local' means that script can start and restart Carla Simulator
 CARLA_HOSTS_NO = 1 # original 1
@@ -10,9 +7,8 @@ SECONDS_PER_EPISODE = 10 # Original 10
 EPISODE_FPS = 60  # Desired
 IMG_WIDTH = 480
 IMG_HEIGHT = 270
-CAR_NPCS = 0 # original 50 npcs
+CAR_NPCS = 10 # original 50 npcs
 RESET_CAR_NPC_EVERY_N_TICKS = 1  # Resets one car NPC every given number of ticks, tick is about a second
-# ACTIONS = ['forward', 'forward_left', 'forward_right', 'brake', 'brake_left', 'brake_right']  # ['forward', 'left', 'right', 'forward_left', 'forward_right', 'backwards', 'backwards_left', 'backwards_right']
 ACTIONS = ['forward_slow', 'forward_medium', 'forward_fast', 'left_slow', 'left_medium', 'left_fast', 'right_slow', 'right_medium', 'right_fast', 'brake_light', 'brake_medium', 'brake_full']
 
 
@@ -26,16 +22,13 @@ COLLISION_FILTER = [['static.sidewalk', -1], ['static.road', -1], ['vehicle.', 5
 # Agent settings
 AGENTS = 1 #% original 1
 AGENT_MEMORY_FRACTION = 0.1 # original 0.1
-AGENT_GPU = None # Original None
-# AGENT_GPU = None  # None, a number (to use given GPU for all agents) or a list - example [0, 1, 1] (first agent - GPU 0, 2nd and 3rd GPU 1)
+AGENT_GPU = None # None, a number (to use given GPU for all agents) or a list - example [0, 1, 1] (first agent - GPU 0, 2nd and 3rd GPU 1)
 AGENT_CARLA_INSTANCE = []  # Empty list for first Carla instance or list in size of AGENTS with Carla instance bounds for agents, for excample [1, 1, 2, 2]
 UPDATE_WEIGHTS_EVERY = 0  # How frequently to update weights (compared to trainer fits), 0 for episode start only
-# AGENT_SHOW_PREVIEW = []  # List of agent id's so show a preview, or empty list
-AGENT_SHOW_PREVIEW = [1]
+AGENT_SHOW_PREVIEW = [1]  # List of agent id's so show a preview, or empty list
 AGENT_SYNCED = True  # Synchronizes agent with frame updates from Carla
 AGENT_IMG_TYPE = 'grayscaled'  # 'rgb', 'grayscaled' or 'stacked' (stacks last 3 consecutive grayscaled frames)
 AGENT_ADDITIONAL_DATA = ['kmh', 'd2wp', 'd2goal']  # What additional data to include next to image data in observation space, possible values: kmh
-# AGENT_ADDITIONAL_DATA = ['kmh']  # What additional data to include next to image data in observation space, possible values: kmh
 
 # Trainer settings
 MINIBATCH_SIZE = 16  # How many steps (samples) to use for training

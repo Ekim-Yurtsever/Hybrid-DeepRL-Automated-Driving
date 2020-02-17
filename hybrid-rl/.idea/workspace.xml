@@ -2,11 +2,6 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="fb847a00-c4eb-432a-a55a-fb0cd19ed839" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/hybrid-rl.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../Santdex-Carla-RL/.gitignore" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../Santdex-Carla-RL/LICENSE" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../Santdex-Carla-RL/README.md" beforeDir="false" />
@@ -25,14 +20,9 @@
       <change beforePath="$PROJECT_DIR$/../Santdex-Carla-RL/sources/tensorboard.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../Santdex-Carla-RL/sources/trainer.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../Santdex-Carla-RL/train.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/settings.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sources/agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/sources/agent.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/sources/carla.py" beforeDir="false" afterPath="$PROJECT_DIR$/sources/carla.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sources/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/sources/models.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sources/navigation/global_route_planner.py" beforeDir="false" afterPath="$PROJECT_DIR$/sources/navigation/global_route_planner.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sources/navigation/modified_local_planner.py" beforeDir="false" afterPath="$PROJECT_DIR$/sources/navigation/modified_local_planner.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sources/trainer.py" beforeDir="false" afterPath="$PROJECT_DIR$/sources/trainer.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/train.py" beforeDir="false" afterPath="$PROJECT_DIR$/train.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -61,7 +51,7 @@
   <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="PropertiesComponent">
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
-    <property name="last_opened_file_path" value="$USER_HOME$/Carla0.9.6/Carla-RL-master-old-original/sources/carla.py" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
     <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
     <property name="nodejs_npm_path_reset_for_default_project" value="true" />
     <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
