@@ -154,6 +154,10 @@ class ARTDQNAgent:
         # Additional inputs?
         if 'kmh' in settings.AGENT_ADDITIONAL_DATA:
             Xs.append((np.array([state[1]]).reshape(-1, 1) - 50) / 50)
+        if 'd2wp' in settings.AGENT_ADDITIONAL_DATA:
+            Xs.append((np.array([state[1]]).reshape(-1, 1) - 8) / 8)
+        if 'd2goal' in settings.AGENT_ADDITIONAL_DATA:
+            Xs.append((np.array([state[1]]).reshape(-1, 1)))
 
         # Predict and return (return additional output when convcam is being used)
         prediction = self.model.predict(Xs)
@@ -265,6 +269,7 @@ def run(id, carla_instance, stop, pause, episode, epsilon, show_preview, weights
     weight_updater.start()
 
     # Predict once on any data to initialize predictions (won't stop episode during first call)
+    # agent.get_qs([np.ones((env.im_height, env.im_width, 1 if settings.AGENT_IMG_TYPE == AGENT_IMAGE_TYPE.grayscaled else 3)), [0]])
     agent.get_qs([np.ones((env.im_height, env.im_width, 1 if settings.AGENT_IMG_TYPE == AGENT_IMAGE_TYPE.grayscaled else 3)), [0]])
 
     agent_stats[0] = AGENT_STATE.playing
