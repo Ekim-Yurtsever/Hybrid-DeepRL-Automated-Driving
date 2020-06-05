@@ -13,12 +13,11 @@ from sources import run_trainer, check_weights_size, TRAINER_STATE, CarlaEnv
 from sources import ConsoleStats, Commands
 from sources import get_carla_exec_command, kill_carla_processes, CarlaEnvSettings, CARLA_SETTINGS_STATE
 
-
 if __name__ == '__main__':
     
     print('Starting...')
 
-    # overal start time
+    # overall start time
     start_time = time.time()
 
     # Create required folders
@@ -34,6 +33,8 @@ if __name__ == '__main__':
     if hparams:
         # If everything is ok, update start time by previous running time
         start_time -= hparams['duration']
+        print('hparams found')
+        time.sleep(10)
 
     # Spawn limited trainer process and get weights' size
     print('Calculating weights size...')
@@ -44,7 +45,7 @@ if __name__ == '__main__':
         time.sleep(0.01)
     p.join()
 
-    # A bunch of variabled and shared variables used to set all parts of ARTDQN and communicate them
+    # A bunch of variables and shared variables used to set all parts of ARTDQN and communicate them
     duration = Value('d')
     episode = Value('L', hparams['episode'] if hparams else 0)
     epsilon = Array('d', hparams['epsilon'] if hparams else [settings.START_EPSILON, settings.EPSILON_DECAY, settings.MIN_EPSILON])
@@ -124,6 +125,7 @@ if __name__ == '__main__':
 
     # Start printing stats to a console
     print('\n'*(settings.AGENTS+22))
+
     console_stats = ConsoleStats(stop, duration, start_time, episode, epsilon, trainer_stats, agent_stats, episode_stats, carla_fps, weights_iteration, optimizer, carla_settings_threads, seconds_per_episode)
     console_stats_thread = Thread(target=console_stats.print, daemon=True)
     console_stats_thread.start()

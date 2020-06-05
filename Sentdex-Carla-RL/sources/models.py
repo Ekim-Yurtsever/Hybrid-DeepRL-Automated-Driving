@@ -250,6 +250,16 @@ def model_head_hidden_dense(model_input, model_output, outputs, model_settings):
         x = Concatenate()([x, kmh_input])
         inputs.append(kmh_input)
 
+    if 'd2wp' in settings.AGENT_ADDITIONAL_DATA:
+        d2wp_input = Input(shape=(1,), name='d2wp_input')
+        x = Concatenate()([x, d2wp_input])
+        inputs.append(d2wp_input)
+
+    if 'd2goal' in settings.AGENT_ADDITIONAL_DATA:
+        d2goal_input = Input(shape=(1,), name='d2goal_input')
+        x = Concatenate()([x, d2goal_input])
+        inputs.append(d2goal_input)
+
     # Add additional fully-connected layer
     x = Dense(model_settings['hidden_1_units'], activation='relu')(x)
 
@@ -274,6 +284,18 @@ def model_head_direct(model_input, model_output, outputs, model_settings):
         y = Dense(4, activation='relu')(kmh_input)
         x = Concatenate()([x, y])
         inputs.append(kmh_input)
+
+    if 'd2wp' in settings.AGENT_ADDITIONAL_DATA:
+        d2wp_input = Input(shape=(1,), name='d2wp_input')
+        y = Dense(4, activation='relu')(d2wp_input)
+        x = Concatenate()([x, y])
+        inputs.append(d2wp_input)
+
+    if 'd2goal' in settings.AGENT_ADDITIONAL_DATA:
+        d2goal_input = Input(shape=(1,), name='d2goal_input')
+        y = Dense(4, activation='relu')(d2goal_input)
+        x = Concatenate()([x, y])
+        inputs.append(d2goal_input)
 
     # And finally output (regression) layer
     predictions = Dense(outputs, activation='linear')(x)

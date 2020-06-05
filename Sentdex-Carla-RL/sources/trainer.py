@@ -29,7 +29,7 @@ sys.stderr = stderr
 class ARTDQNTrainer(ARTDQNAgent):
     def __init__(self, model_path):
 
-        # If model path is beiong passed in - use it instead of creating a new one
+        # If model path is being passed in - use it instead of creating a new one
         self.model_path = model_path
         self.model = self.create_model()
 
@@ -38,7 +38,7 @@ class ARTDQNTrainer(ARTDQNAgent):
         # Save model graph as object property for later use
         self.graph = tf.get_default_graph()
 
-    # Init is being split into two parts. Firs one is being loded always, but this one only for training
+    # Init is being split into two parts. Firs one is being loaded always, but this one only for training
     # (when calculating weights we don't need that)
     def init2(self, stop, logdir, trainer_stats, episode, epsilon, discount, update_target_every, last_target_update, min_reward, agent_show_preview, save_checkpoint_every, seconds_per_episode, duration, optimizer, models, car_npcs):
 
@@ -103,8 +103,13 @@ class ARTDQNTrainer(ARTDQNAgent):
 
         # Get current states from minibatch, then query NN model for Q values
         current_states = [np.array([transition[0][0] for transition in minibatch])/255]
+
         if 'kmh' in settings.AGENT_ADDITIONAL_DATA:
             current_states.append((np.array([[transition[0][1]] for transition in minibatch]) - 50) / 50)
+        if 'd2wp' in settings.AGENT_ADDITIONAL_DATA:
+            current_states.append((np.array([[transition[0][2]] for transition in minibatch]) - 8) / 8)
+        if 'd2goal' in settings.AGENT_ADDITIONAL_DATA:
+            current_states.append((np.array([[transition[0][3]] for transition in minibatch]) - 150) / 150)
         # We need to use previously saved graph here as this is going to be called from separate thread
         with self.graph.as_default():
             current_qs_list = self.model.predict(current_states, settings.PREDICTION_BATCH_SIZE)
@@ -112,14 +117,24 @@ class ARTDQNTrainer(ARTDQNAgent):
         # Get future states from minibatch, then query NN model for Q values
         # When using target network, query it, otherwise main network should be queried
         new_current_states = [np.array([transition[3][0] for transition in minibatch])/255]
+
         if 'kmh' in settings.AGENT_ADDITIONAL_DATA:
             new_current_states.append((np.array([[transition[3][1]] for transition in minibatch]) - 50) / 50)
+        if 'd2wp' in settings.AGENT_ADDITIONAL_DATA:
+            new_current_states.append((np.array([[transition[3][2]] for transition in minibatch]) - 8) / 8)
+        if 'd2goal' in settings.AGENT_ADDITIONAL_DATA:
+            new_current_states.append((np.array([[transition[3][3]] for transition in minibatch]) - 150) / 150)
         with self.graph.as_default():
             future_qs_list = self.target_model.predict(new_current_states, settings.PREDICTION_BATCH_SIZE)
+
 
         X = []
         if 'kmh' in settings.AGENT_ADDITIONAL_DATA:
             X_kmh = []
+        if 'd2wp' in settings.AGENT_ADDITIONAL_DATA:
+            X_d2wp = []
+        if 'd2goal' in settings.AGENT_ADDITIONAL_DATA:
+            X_d2goal = []
         y = []
 
         # Enumerate samples in minibatch
@@ -139,8 +154,15 @@ class ARTDQNTrainer(ARTDQNAgent):
 
             # And append to our training data
             X.append(current_state[0])
+
             if 'kmh' in settings.AGENT_ADDITIONAL_DATA:
                 X_kmh.append([current_state[1]])
+            if 'd2wp' in settings.AGENT_ADDITIONAL_DATA:
+                X_d2wp.append([current_state[2]])
+            if 'd2goal' in settings.AGENT_ADDITIONAL_DATA:
+                X_d2goal.append([current_state[3]])
+
+
             y.append(current_qs)
 
         # Log only on terminal state. As trainer trains in an asynchronous way, it does not know when
@@ -153,8 +175,13 @@ class ARTDQNTrainer(ARTDQNAgent):
 
         # Prepare inputs
         Xs = [np.array(X)/255]
+
         if 'kmh' in settings.AGENT_ADDITIONAL_DATA:
             Xs.append((np.array(X_kmh) - 50) / 50)
+        if 'd2wp' in settings.AGENT_ADDITIONAL_DATA:
+            Xs.append((np.array(X_d2wp) - 8) / 8)
+        if 'd2goal' in settings.AGENT_ADDITIONAL_DATA:
+            Xs.append((np.array(X_d2goal) - 150) / 150)
 
         # Fit on all samples as one batch
         with self.graph.as_default():
@@ -198,7 +225,7 @@ class ARTDQNTrainer(ARTDQNAgent):
         self.weights.raw = self.serialize_weights()
         self.weights_iteration = weights_iteration 
 
-    # Trains model in a loop, calles from a separate thread
+    # Trains model in a loop, called from a separate thread
     def train_in_loop(self):
         self.tps_counter = deque(maxlen=20)
 

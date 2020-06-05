@@ -7,6 +7,15 @@ try:
     sys.path.append(glob.glob(settings.CARLA_PATH + f'/PythonAPI/carla/dist/carla-*{sys.version_info.major}.{sys.version_info.minor}-{"win-amd64" if os.name == "nt" else "linux-x86_64"}.egg')[0])
 except IndexError:
     pass
+
+# try:
+#     sys.path.append(glob.glob(settings.CARLA_PATH + '/PythonAPI/carla/dist/carla-*%d.%d-%s.egg' % (
+#         sys.version_info.major,
+#         sys.version_info.minor,
+#         'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
+# except IndexError:
+#     pass
+
 import carla
 import time
 import random
@@ -17,6 +26,29 @@ import psutil
 import subprocess
 from queue import Queue
 
+# ==============================================================================
+# -- Navigation imports ----------------------------------------------------------
+# ==============================================================================
+
+from sources.navigation.global_route_planner import GlobalRoutePlanner
+from sources.navigation.global_route_planner_dao import GlobalRoutePlannerDAO
+from sources.navigation.modified_local_planner2 import ModifiedLocalPlanner
+
+from numpy import random
+
+# ==============================================================================
+# -- Get colors for debugging --------------------------------------------------
+# ==============================================================================
+
+red = carla.Color(255, 0, 0)
+green = carla.Color(0, 255, 0)
+blue = carla.Color(47, 210, 231)
+cyan = carla.Color(0, 255, 255)
+yellow = carla.Color(255, 255, 0)
+orange = carla.Color(255, 162, 0)
+white = carla.Color(255, 255, 255)
+
+# ==============================================================================
 
 @dataclass
 class ACTIONS:
@@ -36,9 +68,9 @@ ACTION_CONTROL = {
     2: [0, 0, 1],
     3: [1, 0, -1],
     4: [1, 0, 1],
-    5: [0, 1, 0],
-    6: [0, 1, -1],
-    7: [0, 1, 1],
+    5: [0, .1, 0],
+    6: [0, .1, -.1],
+    7: [0, .1, .1],
     8: None,
 }
 
@@ -54,6 +86,53 @@ ACTIONS_NAMES = {
     8: 'no_action',
 }
 
+# @dataclass
+# class ACTIONS:
+#     forward_slow = 0
+#     forward_medium = 1
+#     forward_fast = 2
+#     left_slow = 3
+#     left_medium = 4
+#     left_fast = 5
+#     right_slow = 6
+#     right_medium = 7
+#     right_fast = 8
+#     brake_light = 9
+#     brake_medium = 10
+#     brake_full = 11
+#     no_action = 12
+#
+# ACTION_CONTROL = {
+#     0: [0.3, 0, 0],
+#     1: [0.6, 0, 0],
+#     2: [1, 0, 0],
+#     3: [0.7, 0, -0.3],
+#     4: [0.7, 0, -0.6],
+#     5: [0.7, 0, -1],
+#     6: [0.7, 0, 0.3],
+#     7: [0.7, 0, 0.6],
+#     8: [0.7, 0, 1],
+#     9: [0, 0.3, 0],
+#     10: [0, 0.6, 0],
+#     11: [0, 1, 0],
+#     12: None,
+# }
+#
+# ACTIONS_NAMES = {
+#     0: 'forward_slow',
+#     1: 'forward_medium',
+#     2: 'forward_fast',
+#     3: 'left_slow',
+#     4: 'left_medium',
+#     5: 'left_fast',
+#     6: 'right_slow',
+#     7: 'right_medium',
+#     8: 'right_fast',
+#     9: 'brake_light',
+#     10: 'brake_medium',
+#     11: 'brake_full',
+#     12: 'no_action',
+# }
 
 # Carla environment
 class CarlaEnv:
@@ -68,6 +147,47 @@ class CarlaEnv:
     # Action space size
     action_space_size = len(settings.ACTIONS)
 
+    # ==============================================================================
+    # -- Navigation functions -------------------------------------------------------
+    # ==============================================================================
+
+    def total_distance(self, current_plan):
+        sum = 0
+        for i in range(len(current_plan) - 1):
+            sum = sum + self.distance_wp(current_plan[i + 1][0], current_plan[i][0])
+        return sum
+
+    def distance_wp(self, target, current):
+        dx = target.transform.location.x - current.transform.location.x
+        dy = target.transform.location.y - current.transform.location.y
+        return math.sqrt(dx * dx + dy * dy)
+
+    def distance_goal(self, target, current):
+        dx = target.location.x - current.x
+        dy = target.location.y - current.y
+        return math.sqrt(dx * dx + dy * dy)
+
+    def distance_vehicle(self, waypoint, vehicle_transform):
+        loc = vehicle_transform.location
+        dx = waypoint.transform.location.x - loc.x
+        dy = waypoint.transform.location.y - loc.y
+
+        return math.sqrt(dx * dx + dy * dy)
+
+    def draw_path(self, world, current_plan):
+        for i in range(len(current_plan) - 1):
+            w1 = current_plan[i][0]
+            w2 = current_plan[i + 1][0]
+            self.world.debug.draw_line(w1.transform.location, w2.transform.location, thickness=0.5,
+                                       color=green, life_time=30.0)
+        self.draw_waypoint_info(world, current_plan[-1][0])
+
+    def draw_waypoint_info(self, world, w, lt=30):
+        w_loc = w.transform.location
+        world.debug.draw_point(w_loc, 0.5, red, lt)
+
+    # ==============================================================================
+
     def __init__(self, carla_instance, seconds_per_episode=None, playing=False):
 
         # Set a client and timeouts
@@ -81,7 +201,16 @@ class CarlaEnv:
         blueprint_library = self.world.get_blueprint_library()
 
         # Get Tesla model 3 blueprint
-        self.model_3 = blueprint_library.filter('model3')[0]
+        # self.model_3 = blueprint_library.filter('model3')[0]
+
+        # Get a random blueprint.
+        vehicles = self.world.get_blueprint_library().filter("vehicle.*")
+        self.choices = [x for x in vehicles if int(x.get_attribute('number_of_wheels')) == 4]
+        # self.mycar = random.choice(self.choices)
+        # self.obs = random.choice(self.choices)
+
+        self.mycar = blueprint_library.filter('model3')[0]
+        self.obs = blueprint_library.filter('impala')[0]
 
         # Sensors and helper lists
         self.collision_hist = []
@@ -104,21 +233,82 @@ class CarlaEnv:
         # Sets actually configured actions
         self.actions = [getattr(ACTIONS, action) for action in settings.ACTIONS]
 
+        # Set large initial distance to goal
+        self.prev_d2goal = 10000
+        # self.d2goal = 10000
+        # self.d2wp = 8
+        self.episode = 0
+
     # Resets environment for new episode
     def reset(self):
+        ##########################3
+        self.map = self.world.get_map()
+        self.d2goal = 10000
+        # Initialize the route planner
+        self.dao = GlobalRoutePlannerDAO(self.map, 2.0)  # Create a route for every 2m
+        self.grp = GlobalRoutePlanner(self.dao)
+        self.grp.setup()
+        ###################
+        self.cum = 0
+        self.cum2 = 0
+        self.cum3 = 0
+        self.cum4 = 0
+        self.cum5 = 0
+        self.flag = 0
+        self.attempt = 0
+        ###################
 
         # Car, sensors, etc. We create them every episode then destroy
         self.actor_list = []
 
-        # When Carla breaks (stopps working) or spawn point is already occupied, spawning a car throws an exception
+        # When Carla breaks (stops working) or spawn point is already occupied, spawning a car throws an exception
         # We allow it to try for 3 seconds then forgive (will cause episode restart and in case of Carla broke inform
         # main thread that Carla simulator needs a restart)
         spawn_start = time.time()
         while True:
             try:
                 # Get random spot from a list from predefined spots and try to spawn a car there
-                self.transform = random.choice(self.world.get_map().get_spawn_points())
-                self.vehicle = self.world.spawn_actor(self.model_3, self.transform)
+                # self.transform = random.choice(self.world.get_map().get_spawn_points())
+                # self.vehicle = self.world.spawn_actor(self.mycar, self.transform)
+
+                spawn_points = self.map.get_spawn_points()
+
+                while self.d2goal > 150 or self.d2goal < 50:
+                    pos_a = random.choice(spawn_points)
+                    pos_b = random.choice(spawn_points)
+
+                    a = pos_a.location
+                    b = pos_b.location
+
+                    self.current_plan = self.grp.trace_route(a, b)
+
+                    self.d2goal = self.total_distance(self.current_plan)
+
+                self.transform = pos_a
+                self.vehicle = self.world.try_spawn_actor(self.mycar, self.transform)
+
+                # self.transform = random.choice(self.world.get_map().get_spawn_points())
+                # self.vehicle = self.world.spawn_actor(self.mycar, self.transform)
+                # self.vehicle.set_transform(pos_a)
+
+                args_lateral_dict = {
+                    'K_P': 2,  # 1
+                    'K_D': 0.2,  # 0.02
+                    'K_I': 1,
+                    'dt': 1.0 / 20.0}
+                target_speed = 50
+                self._local_planner = ModifiedLocalPlanner(
+                    self.vehicle, opt_dict={'target_speed': target_speed,
+                                           'lateral_control_dict': args_lateral_dict})
+
+                # assert self.current_plan
+                self._local_planner.set_global_plan(self.current_plan)
+                self.current_plan = self.current_plan[0:len(self.current_plan) - 5][:]
+
+
+                # Draw path for debugging
+                self.draw_path(self.world, self.current_plan)
+
                 break
             except:
                 time.sleep(0.01)
@@ -131,6 +321,7 @@ class CarlaEnv:
         self.actor_list.append(self.vehicle)
 
         # Get the blueprint for the camera
+        # self.rgb_cam = self.world.get_blueprint_library().find('sensor.camera.semantic_segmentation')
         self.rgb_cam = self.world.get_blueprint_library().find('sensor.camera.rgb')
         # Set sensor resolution and field of view
         self.rgb_cam.set_attribute('image_size_x', f'{self.im_width}')
@@ -152,6 +343,7 @@ class CarlaEnv:
         # Preview ("above the car") camera
         if self.preview_camera_enabled is not False:
             # Get the blueprint for the camera
+            # self.preview_cam = self.world.get_blueprint_library().find('sensor.camera.semantic_segmentation')
             self.preview_cam = self.world.get_blueprint_library().find('sensor.camera.rgb')
             # Set sensor resolution and field of view
             self.preview_cam.set_attribute('image_size_x', f'{self.preview_camera_enabled[0]:0f}')
@@ -172,7 +364,7 @@ class CarlaEnv:
 
         # Here's first workaround. If we do not apply any control it takes almost a second for car to start moving
         # after episode restart. That starts counting once we aplly control for a first time.
-        # Workarounf here is to apply both throttle and brakes and disengage brakes once we are ready to start an episode.
+        # Workaround here is to apply both throttle and brakes and disengage brakes once we are ready to start an episode.
         self.vehicle.apply_control(carla.VehicleControl(throttle=1.0, brake=1.0))
 
         # And here's another workaround - it takes a bit over 3 seconds for Carla simulator to start accepting any
@@ -195,7 +387,7 @@ class CarlaEnv:
         # Add the collision sensor to the list of actors
         self.actor_list.append(self.colsensor)
 
-        # Almost ready to start an episide, reset camera update variable
+        # Almost ready to start an episode, reset camera update variable
         self.last_cam_update = time.time()
 
         # Wait for a camera to send first image (important at the beginning of first episode)
@@ -208,10 +400,35 @@ class CarlaEnv:
         # Remember a time of episode start (used to measure duration and set a terminal state)
         self.episode_start = time.time()
 
-        # Return first observation space - current image from the camera sensor
-        return [self.front_camera, 0]
+        ## Add one vehicle on our specific route
+        # self.obs = random.choice(self.choices)
+        self.obs = self.world.get_blueprint_library().filter('impala')[0]
+        # obs_wp = self.current_plan[math.ceil(len(self.current_plan) / 4)][0]
+        obs_wp = self.current_plan[5][0]
+        self.car_actor = self.world.try_spawn_actor(self.obs, pos_b)
+        self.car_actor.set_transform(obs_wp.transform)
 
-    # Collidion data callback handler
+        # Place a vehicle randomly on the road
+        # if random.randint(0, 10) < 3:
+        #     # We set the vehicle on the road, with random moving according to a discrete uniform distribution
+        #     self.car_actor = self.world.try_spawn_actor(self.obs, pos_b)
+        #
+        #     if random.randint(0,10) < 5:
+        #         obs_wp = self.current_plan[math.ceil(len(self.current_plan) / 3)][0]
+        #         self.car_actor.set_autopilot()
+        #     else:
+        #         obs_wp = self.current_plan[math.ceil(len(self.current_plan) / 2)][0]
+        #
+        #     self.car_actor.set_transform(obs_wp.transform)
+        #
+        #     self.actor_list.append(self.car_actor) # No le pongo sensor porque a este pobre solo lo voy a usar como prop
+
+        self.prev_d2goal = 10000
+
+        # Return first observation space - current image from the camera sensor
+        return [self.front_camera, 0, self.d2goal, 3]
+
+    # Collision data callback handler
     def _collision_data(self, event):
 
         # What we collided with and what was the impulse
@@ -277,32 +494,166 @@ class CarlaEnv:
         v = self.vehicle.get_velocity()
         kmh = 3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2)
 
+        d2wp, self.d2goal, wp_in_line, curr_wp, next_wp = self._local_planner.run_step(debug=False)
+
         done = False
 
-        # If car collided - end and episode and send back a penalty
+        eps = 5
+        d0 = 8
+        kmh0 = 50
+
+        # print(self.collision_hist)
+
+        # If car collided - end an episode and send back a penalty
+        # if len(self.collision_hist) != 0:
+        #     done = True
+        #     self.car_actor.destroy()
+        #     reward = -100
         if len(self.collision_hist) != 0:
             done = True
-            reward = -1
+            self.car_actor.destroy()
+            reward = -10
+            self.cum = self.cum + reward
+            self.episode = self.episode + 1
+            # self.res_episode(self,self.episode,self.step,self.cum+reward)
 
-        # Reward
-        elif settings.WEIGHT_REWARDS_WITH_SPEED == 'discrete':
-            reward = settings.SPEED_MIN_REWARD if kmh < 50 else settings.SPEED_MAX_REWARD
+        # elif self.d2goal > eps:
+        #     d2wp, self.d2goal, wp_in_line, curr_wp, next_wp = self._local_planner.run_step(debug=False)
+        #     v = self.vehicle.get_velocity()
+        #     speed = (3.6 * math.sqrt(v.x ** 2 + v.y ** 2 + v.z ** 2))
+        #     t = self.vehicle.get_transform()
+        #
+        #
+        #     player_ang = t.rotation.yaw
+        #     if player_ang < 0:
+        #         player_ang = player_ang + 360
+        #     wp_ang = curr_wp.transform.rotation.yaw
+        #     if wp_ang < 0:
+        #         wp_ang = wp_ang + 360
+        #
+        #     d2curr_ang = abs(player_ang - wp_ang)
+        #
+        #
+        #     d2curr_wp = math.sqrt((t.location.x - curr_wp.transform.location.x) ** 2 + (
+        #                 t.location.y - curr_wp.transform.location.y) ** 2 + (
+        #                                       t.location.z - curr_wp.transform.location.z) ** 2)
+        #     vmax = 50
+        #     r1 = -1 / vmax * abs(speed - vmax) + 1
+        #     dmax = 1.5
+        #     r2 = -1 / dmax * d2curr_wp
+        #     angmax = 45
+        #     r3 = -1 / angmax * d2curr_ang
+        #     reward = r1 + r2 + r3
 
-        elif settings.WEIGHT_REWARDS_WITH_SPEED == 'linear':
-            reward = kmh * (settings.SPEED_MAX_REWARD - settings.SPEED_MIN_REWARD) / 100 + settings.SPEED_MIN_REWARD
+        elif self.d2goal > eps:
 
-        elif settings.WEIGHT_REWARDS_WITH_SPEED == 'quadratic':
-            reward = (kmh / 100) ** 1.3 * (settings.SPEED_MAX_REWARD - settings.SPEED_MIN_REWARD) + settings.SPEED_MIN_REWARD
+            if kmh > 0.1:
+                r1 = 0.5
+            else:
+                r1 = -0.5
+            # r1 = kmh/kmh0 - 1
+            r2 = 1 - d2wp/d0
+            r3 = 1 - self.d2goal/self.prev_d2goal
+
+            ## Normal reward
+            # if r3>0:
+            #     r3 = 1
+            # else:
+            #     r3 = -1
+
+            # reward = r1 + r2 + r3
+            # a = 5
+            # b = 10
+            # c = 20
+            # d = 40
+            # reward2 = r1 + r2 + a*r3
+            # reward3 = r1 + r2 + b*r3
+            # reward4 = r1 + r2 + c*r3
+            # reward5 = r1 + r2 + d*r3
+
+            # print(f'flag: {self.flag} | 1-d/prev_d: {r3:>4.1f} ')
+
+            if self.flag == 1 and r3 < -0.2:
+                aa = 10
+                # done = True
+                # self.car_actor.destroy()
+                # reward = -10
+                # self.flag = 1
+                # self.episode = self.episode + 1
+                # self.cum = self.cum + reward
+                # self.res_episode(self,self.episode,self.step,self.cum+reward)
+            else:
+
+                if r3>0:
+                    r3 = 0.5
+                else:
+                    r3 = -0.5
+
+                reward = r1 + r2 + r3
+                a = 5
+                b = 10
+                c = 20
+                d = 40
+                reward2 = r1 + r2 + a*r3
+                reward3 = r1 + r2 + b*r3
+                reward4 = r1 + r2 + c*r3
+                reward5 = r1 + r2 + d*r3
+
+        elif self.d2goal <= eps:
+            done = True
+            self.car_actor.destroy()
+            reward = 100  # original 1
+            self.episode = self.episode + 1
+            self.cum = self.cum + reward
+            # self.res_episode(self,self.episode,self.step,self.cum+reward)
 
         # If episode duration limit reached - send back a terminal state
         if not self.playing and self.episode_start + self.seconds_per_episode.value < time.time():
             done = True
+            self.car_actor.destroy()
 
         # Weights rewards (not for terminal state)
         if not self.playing and settings.WEIGHT_REWARDS_WITH_EPISODE_PROGRESS and not done:
             reward *= (time.time() - self.episode_start) / self.seconds_per_episode.value
 
-        return [self.front_camera, kmh], reward, done, None
+        # print(self.d2goal)
+        # print(self.prev_d2goal)
+        # print(f'd2goal: {self.d2goal:>4.1f} | prev_d2goal: {self.prev_d2goal:>4.1f} | r3: {r3:>4.1f} ')
+        self.prev_d2goal = self.d2goal
+        self.attempt = self.attempt + 1
+
+        # Here decide with a distribution function how often we are going to fail the sensors
+        # if .... :
+        #     front_camera, kmh, d2goal, d2wp = fail
+        # else:
+        #     front_camera, kmh, d2goal, d2wp = not fail
+
+        self.cum = self.cum + reward
+        self.cum2 = self.cum2 + reward2
+        self.cum3 = self.cum3 + reward3
+        self.cum4 = self.cum4 + reward4
+        self.cum5 = self.cum5 + reward5
+
+        # print(f'r1: {r1:>4.1f} | r2: {r2:>4.1f} | r3: {r3:>4.1f} | r_inst: {reward:>4.1f}  | r_cum: {self.cum:>4.1f} | Action: {settings.ACTIONS[action]} ')
+        # print(f'r1: {r1:>4.1f} | r2: {r2:>4.1f} | r3: {a*r3:>4.1f} | r_inst: {reward2:>4.1f}  | r_cum: {self.cum2:>4.1f} | Action: {settings.ACTIONS[action]} ')
+
+        # print(f'r1: {r1:>4.1f} | r2: {r2:>4.1f} | r3: {b*r3:>4.1f} | r_inst: {reward3:>4.1f}  | r_cum: {self.cum3:>4.1f} | Action: {settings.ACTIONS[action]} ')
+        # print(f'r1: {r1:>4.1f} | r2: {r2:>4.1f} | r3: {c*r3:>4.1f} | r_inst: {reward4:>4.1f}  | r_cum: {self.cum4:>4.1f} | Action: {settings.ACTIONS[action]} ')
+        # print(f'r1: {r1:>4.1f} | r2: {r2:>4.1f} | r3: {d*r3:>4.1f} | r_inst: {reward5:>4.1f}  | r_cum: {self.cum5:>4.1f} | Action: {settings.ACTIONS[action]} ')
+        # print('collision hist: ' + self.collision_hist)
+        # print(f'attempt: {self.attempt}')
+        self.res_episode()
+
+        return [self.front_camera, kmh, self.d2goal, d2wp], reward, done, None
+
+    def fail(self, front_camera, kmh, d2goal, d2wp):
+
+        return front_camera, kmh, d2goal, d2wp
+
+
+    def res_episode(self):
+        # print(f'Episode: {self.episode} | Steps: {self.attempt} | Cum_reward: {self.cum} ')
+        bb = 0
 
     # Destroys all agents created from last .reset() call
     def destroy_agents(self):
@@ -313,7 +664,7 @@ class CarlaEnv:
             if hasattr(actor, 'is_listening') and actor.is_listening:
                 actor.stop()
 
-            # If it's still alive - desstroy it
+            # If it's still alive - destroy it
             if actor.is_alive:
                 actor.destroy()
 
@@ -372,18 +723,20 @@ def start(playing=False):
         print('Starting Carla...')
         kill_processes()
         for process_no in range(1 if playing else settings.CARLA_HOSTS_NO):
-            subprocess.Popen(get_exec_command()[1] + f' -carla-rpc-port={settings.CARLA_HOSTS[process_no][1]}', cwd=settings.CARLA_PATH, shell=True)
+            # subprocess.Popen(get_exec_command()[1] + f' -carla-rpc-port={settings.CARLA_HOSTS[process_no][1]}', cwd=settings.CARLA_PATH, shell=True)
+            subprocess.Popen('SDL_VIDEODRIVER=offscreen ' + get_exec_command()[1]  + ' -quality-level=Low ' +  ' -quality-level=Low ' + f' -carla-rpc-port={settings.CARLA_HOSTS[process_no][1]}', cwd=settings.CARLA_PATH, shell=True)
             time.sleep(2)
 
     # Else just wait for it to be ready
     else:
         print('Waiting for Carla...')
 
-    # Wait for Carla Simulator to be ready
+ # Wait for Carla Simulator to be ready
     for process_no in range(1 if playing else settings.CARLA_HOSTS_NO):
         while True:
             try:
                 client = carla.Client(*settings.CARLA_HOSTS[process_no][:2])
+                # settings.no_rendering_mode = True
                 map_name = client.get_world().get_map().name
                 if len(settings.CARLA_HOSTS[process_no]) == 2 or not settings.CARLA_HOSTS[process_no][2]:
                     break
@@ -411,7 +764,8 @@ def restart(playing=False):
     # Kill Carla processes if there are any and start simulator
     if settings.CARLA_HOSTS_TYPE == 'local':
         for process_no in range(1 if playing else settings.CARLA_HOSTS_NO):
-            subprocess.Popen(get_exec_command()[1] + f' -carla-rpc-port={settings.CARLA_HOSTS[process_no][1]}', cwd=settings.CARLA_PATH, shell=True)
+            # subprocess.Popen(get_exec_command()[1] + f' -carla-rpc-port={settings.CARLA_HOSTS[process_no][1]}', cwd=settings.CARLA_PATH, shell=True)
+            subprocess.Popen('SDL_VIDEODRIVER=offscreen ' + get_exec_command()[1]  + ' -quality-level=Low ' +  f' -carla-rpc-port={settings.CARLA_HOSTS[process_no][1]}', cwd=settings.CARLA_PATH, shell=True)
             time.sleep(2)
 
     # Wait for Carla Simulator to be ready
@@ -451,6 +805,101 @@ def restart(playing=False):
             retries += 1
             if retries >= 60:
                 break
+
+#     # Wait for Carla Simulator to be ready
+#     for process_no in range(1 if playing else settings.CARLA_HOSTS_NO):
+#         while True:
+#             try:
+#                 # client = carla.Client(*settings.CARLA_HOSTS[process_no][:2])
+#                 # map_name = client.get_world().get_map().name
+#                 # if map_name != map_choice:
+#                 #     carla.Client(*settings.CARLA_HOSTS[process_no][:2]).load_world(map_choice)
+#
+#                 client = carla.Client(*settings.CARLA_HOSTS[process_no][:2])
+#                 # settings.no_rendering_mode = True
+#                 map_name = client.get_world().get_map().name
+#                 if len(settings.CARLA_HOSTS[process_no]) == 2 or not settings.CARLA_HOSTS[process_no][2]:
+#                     break
+#                 if isinstance(settings.CARLA_HOSTS[process_no][2], int):
+#                     map_choice = random.choice([map.split('/')[-1] for map in client.get_available_maps()])
+#                     # maps = client.get_available_maps()
+#                     # map_choice = maps[0]
+#                 else:
+#                     map_choice = settings.CARLA_HOSTS[process_no][2]
+#                     # maps = client.get_available_maps()
+#                     # map_choice = maps[0]
+#                 if map_name != map_choice:
+#                     carla.Client(*settings.CARLA_HOSTS[process_no][:2]).load_world(map_choice)
+#                     while True:
+#                         try:
+#                             while carla.Client(*settings.CARLA_HOSTS[process_no][:2]).get_world().get_map().name != map_choice:
+#                                 time.sleep(0.1)
+#                             break
+#                         except:
+#                             pass
+#                 break
+#             except Exception as e:
+#                 #print(str(e))
+#                 time.sleep(0.1)
+#
+#
+# # Retarts Carla simulator
+# def restart(playing=False):
+#     # Kill Carla processes if there are any and start simulator
+#     if settings.CARLA_HOSTS_TYPE == 'local':
+#         for process_no in range(1 if playing else settings.CARLA_HOSTS_NO):
+#             # subprocess.Popen(get_exec_command()[1] + f' -carla-rpc-port={settings.CARLA_HOSTS[process_no][1]}', cwd=settings.CARLA_PATH, shell=True)
+#             subprocess.Popen('SDL_VIDEODRIVER=offscreen ' + get_exec_command()[1]  + ' -quality-level=Low ' +  f' -carla-rpc-port={settings.CARLA_HOSTS[process_no][1]}', cwd=settings.CARLA_PATH, shell=True)
+#             time.sleep(2)
+#
+#     # Wait for Carla Simulator to be ready
+#     for process_no in range(1 if playing else settings.CARLA_HOSTS_NO):
+#         retries = 0
+#         while True:
+#             try:
+#                 client = carla.Client(*settings.CARLA_HOSTS[process_no][:2])
+#                 map_name = client.get_world().get_map().name
+#
+#                 # maps = client.get_available_maps()
+#                 # map_choice = maps[4]
+#                 #
+#                 # if map_name != map_choice:
+#                 #     carla.Client(*settings.CARLA_HOSTS[process_no][:2]).load_world(map_choice)
+#
+#                 if len(settings.CARLA_HOSTS[process_no]) == 2 or not settings.CARLA_HOSTS[process_no][2]:
+#                     break
+#                 if isinstance(settings.CARLA_HOSTS[process_no][2], int):
+#                     map_choice = random.choice([map.split('/')[-1] for map in client.get_available_maps()])
+#                     # maps = client.get_available_maps()
+#                     # map_choice = maps[0]  # 0 is Town04, 4 is Town02
+#                 else:
+#                     map_choice = settings.CARLA_HOSTS[process_no][2]
+#                     # maps = client.get_available_maps()
+#                     # map_choice = maps[0]  # 0 is Town04, 4 is Town02
+#                 if map_name != map_choice:
+#                     carla.Client(*settings.CARLA_HOSTS[process_no][:2]).load_world(map_choice)
+#                     while True:
+#                         try:
+#                             while carla.Client(*settings.CARLA_HOSTS[process_no][:2]).get_world().get_map().name != map_choice:
+#                                 time.sleep(0.1)
+#                                 retries += 1
+#                                 if retries >= 60:
+#                                     raise Exception('Couldn\'t change map [1]')
+#                             break
+#                         except Exception as e:
+#                             time.sleep(0.1)
+#                         retries += 1
+#                         if retries >= 60:
+#                             raise Exception('Couldn\'t change map [2]')
+#
+#                 break
+#             except Exception as e:
+#                 #print(str(e))
+#                 time.sleep(0.1)
+#
+#             retries += 1
+#             if retries >= 60:
+#                 break
 
 
 # Parts of weather control code and npc car spawn code are copied from dynamic_weather.py and spawn_npc.py from examples, then modified
@@ -530,7 +979,7 @@ class CARLA_SETTINGS_STATE:
 CARLA_SETTINGS_STATE_MESSAGE = {
     0: 'STARTING',
     1: 'WORKING',
-    2: 'RESTARING',
+    2: 'RESTARTING',
     3: 'FINISHED',
     4: 'ERROR',
 }
@@ -543,7 +992,7 @@ class CarlaEnvSettings:
         # Speed factor changes how fast weather should change
         self.speed_factor = 1.0
 
-        # Process number (Carla instane to use)
+        # Process number (Carla instance to use)
         self.process_no = process_no
 
         # Weather and NPC variables
@@ -647,7 +1096,7 @@ class CarlaEnvSettings:
                 # Clean car npcs
                 self.clean_carnpcs()
 
-                # Connect to Carla, get worls and map
+                # Connect to Carla, get worlds and map
                 self.client = carla.Client(*settings.CARLA_HOSTS[self.process_no][:2])
                 self.client.set_timeout(2.0)
                 self.world = self.client.get_world()
@@ -657,8 +1106,12 @@ class CarlaEnvSettings:
                 # Create weather object or update it if exists
                 if self.weather is None:
                     self.weather = Weather(self.world.get_weather())
+                    weather_param = carla.WeatherParameters.ClearNoon
+                    self.world.set_weather(weather_param)
                 else:
-                    self.weather.set_new_weather(self.world.get_weather())
+                    # self.weather.set_new_weather(self.world.get_weather())
+                    weather_param = carla.WeatherParameters.ClearNoon
+                    self.world.set_weather(weather_param)
 
                 # Get car blueprints and filter them
                 self.car_blueprints = self.world.get_blueprint_library().filter('vehicle.*')
@@ -721,7 +1174,11 @@ class CarlaEnvSettings:
 
                         # Get random map and load it
                         map_choice = random.choice(list({map.split('/')[-1] for map in self.client.get_available_maps()} - {self.client.get_world().get_map().name}))
+                        # maps = self.client.get_available_maps()
+                        # map_choice = maps[0] # 0 is Town04, 4 is Town02
                         self.client.load_world(map_choice)
+
+
 
                         # Wait for world to be fully loaded
                         retries = 0
@@ -786,7 +1243,7 @@ class CarlaEnvSettings:
                         self._destroy_car_npc(car_npc)
 
                     # If we reached despawn tick, remove oldest NPC
-                    # The reson we want to do that is to rotate cars aroubd the map
+                    # The reason we want to do that is to rotate cars around the map
                     if car_despawn_tick >= self.car_npcs[1] and len(self.spawned_car_npcs):
 
                         # Get id of the first car on a list and destroy it
@@ -843,8 +1300,11 @@ class CarlaEnvSettings:
                             self.spawned_car_npcs[car_actor.id] = [car_actor, colsensor]
 
                     # Tick a weather and set it in Carla
-                    self.weather.tick(self.speed_factor)
-                    self.world.set_weather(self.weather.weather)
+                    # self.weather.tick(self.speed_factor)
+                    # self.world.set_weather(self.weather.weather)
+
+                    weather_param = carla.WeatherParameters.ClearNoon
+                    self.world.set_weather(weather_param)
 
                     # Set stats for tensorboard
                     self.stats[0] = len(self.spawned_car_npcs)
