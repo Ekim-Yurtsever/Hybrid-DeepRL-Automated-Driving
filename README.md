@@ -3,9 +3,21 @@
 Codebase for our Hybrid Deep Reinforcement Learning (H-DRL) based automated driving project.
 The related paper can be accessed with [this](https://arxiv.org/pdf/2002.00434.pdf) link.
 
+If you find the code useful for your research, please consider citing our paper:
+
+      @inproceedings{yurtsever2020integrating,
+        title={Integrating deep reinforcement learning with model-based path planners for automated driving},
+        author={Yurtsever, Ekim and Capito, Linda and Redmill, Keith and Ozguner, Umit},
+        booktitle={2020 IEEE Intelligent Vehicles Symposium (IV)},
+        pages={1311--1316},
+        year={2020},
+        organization={IEEE}
+      }
+
+> Yurtsever, E., Capito, L., Redmill, K., & Ozguner, U. (2020, June). Integrating deep reinforcement learning with model-based path planners for automated driving. In 2020 IEEE Intelligent Vehicles Symposium (IV) (pp. 1311-1316). IEEE.
+
 ## Work in progress. Stay tuned for the full release.
 
-## Features
 
 ## Overview
 
