@@ -16,8 +16,6 @@ If you find the code useful for your research, please consider citing our paper:
 
 > Yurtsever, E., Capito, L., Redmill, K., & Ozguner, U. (2020, June). Integrating deep reinforcement learning with model-based path planners for automated driving. In 2020 IEEE Intelligent Vehicles Symposium (IV) (pp. 1311-1316). IEEE.
 
-## Work in progress. Stay tuned for the full release.
-
 
 ## Overview
 
